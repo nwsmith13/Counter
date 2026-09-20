@@ -1,0 +1,9 @@
+{
+  "name": "blue-springs-bowl-counter",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": { "dev": "vite", "build": "tsc -b && vite build", "test": "vitest run", "lint": "eslint ." },
+  "dependencies": { "@vitejs/plugin-react": "latest", "vite": "latest", "react": "latest", "react-dom": "latest" },
+  "devDependencies": { "typescript": "latest", "vitest": "latest", "eslint": "latest", "@eslint/js": "latest", "typescript-eslint": "latest", "eslint-plugin-react-hooks": "latest", "eslint-plugin-react-refresh": "latest", "@types/react": "latest", "@types/react-dom": "latest" }
+}
