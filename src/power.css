@@ -1,0 +1,87 @@
+/* React owns the startup clock. CSS only paints the visual state selected by
+   React; it never decides which lane advances next. */
+.lane-grid > article.lane-console.powering-up {
+  animation: none !important;
+  transition: background-image 120ms linear, filter 120ms linear, box-shadow 120ms linear;
+}
+
+html:root .lane-grid > article.lane-console.powering-up.power-off {
+  background-color: #536066 !important;
+  background-image: linear-gradient(90deg, #17232c, #56636a 13%, #8e989c 46%, #566167 78%, #16232b) !important;
+  border-color: #6d7b81 !important;
+  color: #eff5f7 !important;
+  filter: saturate(.18) brightness(.86) !important;
+  box-shadow: inset 0 0 22px #0008, 0 6px 16px #0008 !important;
+}
+
+html:root .lane-grid > article.lane-console.powering-up.power-off .lane-status {
+  background: #59676d !important;
+  color: #eef5f7 !important;
+}
+
+html:root .lane-grid > article.lane-console.powering-up.power-off .lane-operational {
+  background: linear-gradient(180deg, #0d182344, #02080c7a) !important;
+}
+
+html:root .lane-grid > article.lane-console.powering-up.power-off .pin-deck {
+  filter: grayscale(1) brightness(.74) !important;
+}
+
+html:root .lane-grid > article.lane-console.powering-up.power-weak {
+  background-color: #176d4f !important;
+  background-image: linear-gradient(90deg, #102f2a, #176d4f 15%, #248f64 48%, #176c4d 79%, #102d28) !important;
+  border-color: #3f9d72 !important;
+  filter: saturate(.62) brightness(.70) !important;
+  box-shadow: 0 0 11px #43e88a55, 0 6px 16px #0008 !important;
+}
+
+/* The sign is not in the DOM until the sequence is complete. Once mounted,
+   this compact housing and tubing briefly buzzes before becoming steady. */
+.open-neon {
+  min-width: 66px;
+  padding: 6px 8px 5px;
+  border: 1px solid #1d4055;
+  border-radius: 4px;
+  background: #061521;
+  color: #1d536b;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: .78rem;
+  font-style: normal;
+  font-weight: 900;
+  letter-spacing: .16em;
+  line-height: 1;
+  text-align: center;
+  text-shadow: 0 1px #000;
+  box-shadow: inset 0 0 0 2px #0007, inset 0 0 9px #071c2a;
+}
+
+.open-neon.lit {
+  color: #dffbff;
+  animation: open-tubing-start .58s steps(2, end) both;
+  text-shadow: 0 0 2px #fff, 0 0 5px #39d6f6, 0 0 12px #1697c4;
+  box-shadow: inset 0 0 0 1px #7ae9ff88, inset 0 0 8px #0a6686, 0 0 7px #1fd0f566, 0 0 14px #1fd0f533;
+}
+
+.open-neon.shutting-down { animation: open-tubing-stop .58s steps(2, end) both; }
+
+@keyframes open-tubing-start {
+  0%,20% { color:#23586e; text-shadow:none; box-shadow:inset 0 0 0 2px #0007, inset 0 0 9px #071c2a; }
+  33% { color:#a6efff; text-shadow:0 0 4px #31d8f6; box-shadow:inset 0 0 0 1px #59dffb77, 0 0 6px #25ccef55; }
+  46% { color:#1b5068; text-shadow:none; box-shadow:inset 0 0 0 2px #0007, inset 0 0 9px #071c2a; }
+  62% { color:#c8f7ff; text-shadow:0 0 5px #38d9f6; box-shadow:inset 0 0 0 1px #6deaff88, 0 0 8px #27cdf077; }
+  76% { color:#1b5068; text-shadow:none; box-shadow:inset 0 0 0 2px #0007, inset 0 0 9px #071c2a; }
+  100% { color:#dffbff; text-shadow:0 0 2px #fff, 0 0 5px #39d6f6, 0 0 12px #1697c4; box-shadow:inset 0 0 0 1px #7ae9ff88, inset 0 0 8px #0a6686, 0 0 7px #1fd0f566, 0 0 14px #1fd0f533; }
+}
+
+@keyframes open-tubing-stop {
+  0%,22% { color:#dffbff; text-shadow:0 0 2px #fff, 0 0 5px #39d6f6, 0 0 12px #1697c4; box-shadow:inset 0 0 0 1px #7ae9ff88, inset 0 0 8px #0a6686, 0 0 7px #1fd0f566; }
+  36% { color:#275c70; text-shadow:none; box-shadow:inset 0 0 0 2px #0007, inset 0 0 9px #071c2a; }
+  50% { color:#b7f3ff; text-shadow:0 0 4px #32d8f5; box-shadow:0 0 6px #24ccef66; }
+  64%,100% { color:#1d536b; text-shadow:0 1px #000; box-shadow:inset 0 0 0 2px #0007, inset 0 0 9px #071c2a; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lane-grid > article.lane-console.powering-up,
+  .open-neon.lit,
+  .open-neon.shutting-down { animation: none !important; transition: none !important; }
+}
