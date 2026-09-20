@@ -1,0 +1,10 @@
+# Dependencies are installed by the deployment environment for its own OS.
+node_modules/
+
+# Generated Vite output.
+dist/
+
+# Local Vercel project metadata and environment overrides.
+.vercel/
+.env.local
+.env.*.local
