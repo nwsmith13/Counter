@@ -1,6 +1,6 @@
 {
-  "name": "Blue Springs Bowl",
-  "short_name": "BSB Open Play",
+  "name": "Blue Springs Bowl — Open Play Book",
+  "short_name": "Open Play Book",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#061a30",
