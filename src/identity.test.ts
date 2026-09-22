@@ -4,7 +4,7 @@ import { STORAGE_KEY } from './store'
 import { ownerEdit, preservesActiveOwner } from './owner-safety'
 
 const employee = (role: Employee['role']='EMPLOYEE', active=true): Employee => ({ id:'employee-1', organizationId:'org-1', displayName:'Matthew', role, active })
-const session = (patch: Partial<TerminalSession>={}): TerminalSession => ({ token:'opaque-session-token', employee:employee(), expiresAt:'2026-09-22T03:00:00.000Z', ...patch })
+const session = (patch: Partial<TerminalSession>={}): TerminalSession => ({ token:'opaque-session-token', employee:employee(), expiresAt:'2099-01-01T00:00:00.000Z', ...patch })
 const memoryStorage = () => { const values=new Map<string,string>(); return { getItem:(key:string)=>values.get(key)??null,setItem:(key:string,value:string)=>void values.set(key,value),removeItem:(key:string)=>void values.delete(key),values } }
 
 describe('shared employee identity', () => {
@@ -20,7 +20,7 @@ describe('shared employee identity', () => {
   })
 
   it('rejects expired and inactive persisted sessions', () => {
-    expect(isSessionUsable(session(),new Date('2026-09-22T03:00:00.000Z').getTime())).toBe(false)
+    expect(isSessionUsable(session({expiresAt:'2026-09-22T03:00:00.000Z'}),new Date('2026-09-22T03:00:00.000Z').getTime())).toBe(false)
     expect(isSessionUsable(session({employee:employee('EMPLOYEE',false)}),new Date('2026-09-21').getTime())).toBe(false)
   })
 
