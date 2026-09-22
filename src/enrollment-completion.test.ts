@@ -15,6 +15,7 @@ describe('device enrollment completion', () => {
     expect(setupCode).toBe('')
     expect(path).toBe('/')
     expect([...storage.values.values()]).not.toContain('9B87F241678E1403')
+    expect(storage.getItem(IDENTITY_SESSION_KEY)).toBeNull()
   })
 
   it('uses the persisted credential after a simulated refresh or browser relaunch instead of setup data', () => {

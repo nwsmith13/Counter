@@ -4,6 +4,7 @@ import nightFix from '../supabase/migrations/202609210004_open_play_business_nig
 import auditMigration from '../supabase/migrations/202609210006_open_play_authoritative_audit.sql?raw'
 import voidMigration from '../supabase/migrations/202609210007_open_play_payment_and_void.sql?raw'
 import milestoneSnapshotMigration from '../supabase/migrations/202609210008_open_play_session_milestone_snapshot.sql?raw'
+import closeNightGuardFix from '../supabase/migrations/202609220001_close_night_void_guard_fix.sql?raw'
 import deviceEnrollmentMigration from '../supabase/migrations/202609210005_device_enrollment.sql?raw'
 
 describe('shared Open Play migration foundation', () => {
@@ -114,6 +115,26 @@ describe('session milestone snapshot migration', () => {
     expect(milestoneSnapshotMigration).toContain("'checkedOutAt',checked_out_at")
     expect(milestoneSnapshotMigration).toContain("'reopenedAt',reopened_at")
     expect(milestoneSnapshotMigration).toContain('bsb_open_play_require_actor(p_session_token,p_device_token)')
+  })
+})
+
+describe('close-night void guard migration', () => {
+  it('keeps non-void unresolved sessions blocking while exempting every currently voided session', () => {
+    expect(closeNightGuardFix).toContain("s.status<>'VOIDED'")
+    expect(closeNightGuardFix).toContain("s.status<>'COMPLETED'")
+    expect(closeNightGuardFix).toContain("s.type='OPEN_BOWLING'")
+    expect(closeNightGuardFix).toContain("s.data->'pricing'->'chargedTotalCents'='null'::jsonb")
+    expect(closeNightGuardFix.indexOf("s.status<>'VOIDED'")).toBeLessThan(closeNightGuardFix.indexOf("s.data->'pricing'->'chargedTotalCents'"))
+    expect(closeNightGuardFix).not.toContain('pre_void_status')
+  })
+
+  it('preserves authorization, locking, audit, and gives employees a blocker count', () => {
+    expect(closeNightGuardFix).toContain('security definer set search_path = public, pg_temp')
+    expect(closeNightGuardFix).toContain('bsb_open_play_require_actor(p_session_token,p_device_token)')
+    expect(closeNightGuardFix).toContain("status='OPEN' for update")
+    expect(closeNightGuardFix).toContain("'NIGHT_CLOSED'")
+    expect(closeNightGuardFix).toContain("session%s still need resolution")
+    expect(closeNightGuardFix).toContain('grant execute on function public.bsb_close_night(text,text) to anon')
   })
 })
 

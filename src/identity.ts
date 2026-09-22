@@ -38,5 +38,6 @@ export const clearTerminalSession = (storage: Pick<Storage, 'removeItem'> = loca
   storage.removeItem(IDENTITY_SESSION_KEY)
 
 export const canManageEmployees = (employee: Employee | null) => employee?.role === 'OWNER'
-export const canManageDevices = canManageEmployees
+export const canManageDevices = (employee: Employee | null) => employee?.role === 'OWNER' || employee?.role === 'MANAGER'
+export const canRemoveDeviceAccess = (employee: Employee | null) => employee?.role === 'OWNER'
 export const isValidPinFormat = (pin: string) => /^\d{4}$/.test(pin)

@@ -1,7 +1,9 @@
 {
   "name": "Blue Springs Bowl — Open Play Book",
   "short_name": "Open Play Book",
+  "id": "/",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#061a30",
   "theme_color": "#061a30",

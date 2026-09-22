@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { canManageDevices, canManageEmployees, clearTerminalSession, DEVICE_TOKEN_KEY, IDENTITY_SESSION_KEY, isSessionUsable, isValidPinFormat, readTerminalSession, writeDeviceToken, writeTerminalSession, type Employee, type TerminalSession } from './identity'
+import { canManageDevices, canManageEmployees, canRemoveDeviceAccess, clearTerminalSession, DEVICE_TOKEN_KEY, IDENTITY_SESSION_KEY, isSessionUsable, isValidPinFormat, readTerminalSession, writeDeviceToken, writeTerminalSession, type Employee, type TerminalSession } from './identity'
 import { STORAGE_KEY } from './store'
 import { ownerEdit, preservesActiveOwner } from './owner-safety'
 
@@ -37,13 +37,16 @@ describe('shared employee identity', () => {
     expect(canManageEmployees(employee('EMPLOYEE'))).toBe(false)
   })
 
-  it('allows only OWNER to manage devices and stores a redeemed credential only in identity storage', () => {
+  it('allows OWNER and MANAGER to view/add devices but only OWNER to remove access', () => {
     const storage=memoryStorage(); writeDeviceToken('new-device-token',storage)
     expect(storage.getItem(DEVICE_TOKEN_KEY)).toBe('new-device-token')
     expect(storage.getItem(STORAGE_KEY)).toBeNull()
     expect(canManageDevices(employee('OWNER'))).toBe(true)
-    expect(canManageDevices(employee('MANAGER'))).toBe(false)
+    expect(canManageDevices(employee('MANAGER'))).toBe(true)
     expect(canManageDevices(employee('EMPLOYEE'))).toBe(false)
+    expect(canRemoveDeviceAccess(employee('OWNER'))).toBe(true)
+    expect(canRemoveDeviceAccess(employee('MANAGER'))).toBe(false)
+    expect(canRemoveDeviceAccess(employee('EMPLOYEE'))).toBe(false)
   })
 
   describe('active owner safety invariant', () => {

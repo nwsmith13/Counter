@@ -7,10 +7,27 @@ const anonKey = runtimeConfiguration.supabaseAnonKey
 export const identityConfigured = Boolean(url && anonKey && !runtimeConfiguration.error)
 const client: SupabaseClient | null = url && anonKey ? createClient(url, anonKey, { auth: { persistSession: false } }) : null
 
+export const DEVICE_ACCESS_REMOVED_CODE = 'BSB01'
+export const SETUP_CODE_REJECTED_CODE = 'BSB02'
+
+export class IdentityApiError extends Error {
+  constructor(message: string, readonly code?: string) { super(message); this.name = 'IdentityApiError' }
+}
+
+export const isDeviceAccessRemoved = (error: unknown) =>
+  error instanceof IdentityApiError
+    ? error.code === DEVICE_ACCESS_REMOVED_CODE || /unauthorized device/i.test(error.message)
+    : error instanceof Error && /unauthorized device/i.test(error.message)
+
+export const isSetupCodeRejected = (error: unknown) =>
+  error instanceof IdentityApiError
+    ? error.code === SETUP_CODE_REJECTED_CODE || /invalid or expired setup code/i.test(error.message)
+    : error instanceof Error && /invalid or expired setup code/i.test(error.message)
+
 const rpc = async <T>(name: string, args: Record<string, unknown>): Promise<T> => {
   if (!client) throw new Error('Identity service is not configured on this terminal.')
   const { data, error } = await client.rpc(name, args)
-  if (error) throw new Error(error.message)
+  if (error) throw new IdentityApiError(error.message, error.code)
   return data as T
 }
 
