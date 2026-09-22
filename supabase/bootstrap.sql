@@ -1,0 +1,6 @@
+-- Legacy bootstrap intentionally retired.
+--
+-- Production identity records must not be created from a checked-in script
+-- containing PINs or device credentials. Existing installations are unchanged.
+-- Provision additional terminals through OWNER > Devices in Open Play Book.
+-- See docs/production-rollout.md for the verified rollout procedure.

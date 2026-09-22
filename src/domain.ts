@@ -1,5 +1,6 @@
 export type SessionType = 'OPEN_BOWLING' | 'PRE_POST' | 'PARTY'
-export type SessionStatus = 'ACTIVE' | 'AWAITING_CLOSE' | 'COMPLETED'
+export type SessionStatus = 'ACTIVE' | 'AWAITING_CLOSE' | 'COMPLETED' | 'VOIDED'
+export type VoidCategory = 'ENTERED_BY_MISTAKE' | 'TRAINING_TEST' | 'DUPLICATE' | 'OTHER'
 export type LaneConditionKind = 'AVAILABLE' | 'DOWN' | 'WATCH'
 export type LaneNumber = number
 
@@ -8,12 +9,12 @@ export type League = { id: string; name: string; active: boolean; sortOrder: num
 export type Night = { id: string; businessDate: string; openedAt: string; closedAt: string | null; status: 'OPEN' | 'ARCHIVED' }
 export type LaneAssignment = { id: string; sessionId: string; laneNumber: LaneNumber; startedAt: string; billingStartedAt?: string; billingGroupId?: string; billableStartedAt?: string | null; endedAt: string | null; endReason: 'RELEASED' | 'MOVED' | 'SESSION_ENDED' | null; downOverrideConfirmed: boolean }
 export type Pricing = { laneRateCentsPerHour: number; shoeRateCents: number; gracePeriodMinutes: number; minimumChargeCents: number; taxRate?: number; bowlingSubtotalCents?: number | null; shoeSubtotalCents?: number | null; taxableSubtotalCents?: number | null; taxCents?: number | null; calculatedTotalCents: number | null; roundedTotalCents: number | null; chargedTotalCents: number | null; adjustmentNote: string | null }
-export type SessionBase = { id: string; nightId: string; type: SessionType; status: SessionStatus; startedAt: string; endedAt: string | null; createdAt: string; updatedAt: string; notes: string | null }
+export type SessionBase = { id: string; nightId: string; type: SessionType; status: SessionStatus; startedAt: string; endedAt: string | null; checkedOutAt?: string | null; reopenedAt?: string | null; createdAt: string; updatedAt: string; notes: string | null; voidedAt?: string | null; voidedBy?: string | null; voidedByName?: string | null; voidCategory?: VoidCategory | null; voidNote?: string | null; preVoidStatus?: 'AWAITING_CLOSE' | 'COMPLETED' | null; reinstatedAt?: string | null; reinstatedBy?: string | null; reinstatedByName?: string | null; reinstatementNote?: string | null }
 export type OpenSession = SessionBase & { type: 'OPEN_BOWLING'; partyName: string | null; bowlerCount: number; shoeCount: number; pricing: Pricing }
 export type PrePostSession = SessionBase & { type: 'PRE_POST'; leagueId: string; leagueNameSnapshot: string; designation: 'PRE' | 'POST'; teamDescription: string | null; bowlerCount?: number }
 export type PartySession = SessionBase & { type: 'PARTY'; partyName: string; bowlerCount?: number; partyAmountCents?: number }
 export type Session = OpenSession | PrePostSession | PartySession
-export type ActivityEvent = { id: string; nightId: string; occurredAt: string; type: string; sessionId: string | null; laneNumbers: number[]; summary: string }
+export type ActivityEvent = { id: string; nightId: string | null; occurredAt: string; type: string; sessionId: string | null; laneNumbers: number[]; summary: string; employeeId?: string | null; employeeName?: string | null; deviceId?: string | null; details?: Record<string, unknown> }
 export type Settings = { timezone: string; laneCount: number; openBowlingLaneRateCents: number; shoeRentalRateCents: number; openBowlingGracePeriodMinutes: number; openBowlingMinimumChargeCents: number; openBowlingTaxRate: number; showFactsAndJokes: boolean; soundEffectsEnabled: boolean }
 export type AppState = { schemaVersion: 1; settings: Settings; currentNightId: string | null; nights: Record<string, Night>; sessions: Record<string, Session>; laneAssignments: Record<string, LaneAssignment>; leagues: Record<string, League>; laneConditions: Record<string, LaneCondition>; activity: ActivityEvent[] }
 
@@ -59,6 +60,20 @@ export const calculatePricing = (state: AppState, session: OpenSession, now = is
 export const defaultChargeCents = (calculatedTotalCents: number) => calculatedTotalCents
 export const formatDuration = (ms: number) => { const seconds = Math.max(0, Math.floor(ms / 1000)); return `${Math.floor(seconds / 3600)}:${String(Math.floor(seconds / 60) % 60).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}` }
 export const displayName = (session: Session) => session.type === 'OPEN_BOWLING' ? session.partyName || 'Open Bowling' : session.type === 'PARTY' ? session.partyName : session.teamDescription || session.leagueNameSnapshot
+export const operationalSessions = (state: AppState, nightId: string | undefined) => Object.values(state.sessions).filter(session => session.nightId === nightId && session.status !== 'VOIDED')
+const timestampMs = (value: string | null | undefined) => value ? new Date(value).getTime() : Number.NEGATIVE_INFINITY
+const latestTimestamp = (...values: (string | null | undefined)[]) => values.reduce<string | null>((latest, value) => timestampMs(value) > timestampMs(latest) ? value ?? null : latest, null)
+// This is the persisted lifecycle milestone represented by the session's current state.
+// It intentionally never consults the browser clock.
+export const sessionOperationalMilestoneAt = (session: Session) => {
+  if (session.status === 'VOIDED') return session.voidedAt ?? null
+  if (session.status === 'ACTIVE') return latestTimestamp(session.startedAt, session.reopenedAt, session.reinstatedAt)
+  if (session.status === 'AWAITING_CLOSE') return latestTimestamp(session.endedAt, session.reopenedAt, session.reinstatedAt)
+  return latestTimestamp(session.checkedOutAt, session.endedAt, session.reopenedAt, session.reinstatedAt)
+}
+export const sortSessionsByMilestoneNewestFirst = (sessions: Session[]) => [...sessions].sort((a, b) => timestampMs(sessionOperationalMilestoneAt(b)) - timestampMs(sessionOperationalMilestoneAt(a)) || a.id.localeCompare(b.id))
+export const sessionLaneHistory = (state: AppState, sessionId: string) => assignmentsFor(state, sessionId).sort((a,b) => new Date(a.startedAt).getTime()-new Date(b.startedAt).getTime() || a.laneNumber-b.laneNumber).map(assignment => assignment.laneNumber)
+export const operationalLaneHours = (state: AppState, nightId: string | undefined, now = iso()) => Object.values(state.laneAssignments).filter(assignment => { const session=state.sessions[assignment.sessionId]; return session?.nightId===nightId&&session.status!=='VOIDED' }).reduce((total,assignment)=>total+(new Date(assignment.endedAt??now).getTime()-new Date(assignment.startedAt).getTime())/3_600_000,0)
 export const completedPartyRevenueCents = (state: AppState, nightId: string | undefined) => Object.values(state.sessions).filter((session): session is PartySession => session.nightId === nightId && session.type === 'PARTY' && session.status === 'COMPLETED').reduce((total, session) => total + (session.partyAmountCents ?? 0), 0)
 export type NightRevenueSummary = { calculatedOpenBowlingCents: number; bowlingComponentCents: number; taxComponentCents: number; openBowlingCollectedCents: number; shoeRentalCount: number; shoeComponentCents: number; partyCollectedCents: number; totalCollectedCents: number; openBowlingAdjustmentCents: number }
 export const nightRevenueSummary = (state: AppState, nightId: string | undefined): NightRevenueSummary => {
