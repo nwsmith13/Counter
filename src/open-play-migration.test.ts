@@ -4,6 +4,7 @@ import nightFix from '../supabase/migrations/202609210004_open_play_business_nig
 import auditMigration from '../supabase/migrations/202609210006_open_play_authoritative_audit.sql?raw'
 import voidMigration from '../supabase/migrations/202609210007_open_play_payment_and_void.sql?raw'
 import milestoneSnapshotMigration from '../supabase/migrations/202609210008_open_play_session_milestone_snapshot.sql?raw'
+import deviceEnrollmentMigration from '../supabase/migrations/202609210005_device_enrollment.sql?raw'
 
 describe('shared Open Play migration foundation', () => {
   it('creates the reduced operational tables with direct browser access restricted', () => {
@@ -55,6 +56,21 @@ describe('shared Open Play migration foundation', () => {
     expect(migration).not.toContain('set search_path = public, extensions')
     expect(migration).toContain('extensions.digest(p_session_token')
     expect(migration).toContain('extensions.digest(p_device_token')
+  })
+})
+
+describe('device enrollment safety', () => {
+  it('keeps redeemed setup codes one-time and does not turn them into device credentials', () => {
+    expect(deviceEnrollmentMigration).toContain('x.used_at is not null')
+    expect(deviceEnrollmentMigration).toContain('update public.device_enrollment_codes set used_at=now()')
+    expect(deviceEnrollmentMigration).toContain("return jsonb_build_object('device_token',token")
+    expect(deviceEnrollmentMigration).not.toContain('code_token')
+  })
+
+  it('keeps deactivation server-authoritative and requires new enrollment to reactivate a device', () => {
+    expect(deviceEnrollmentMigration).toContain("if p_active then raise exception 'Inactive devices must be reauthorized with a new setup code'; end if;")
+    expect(deviceEnrollmentMigration).toContain('update public.authorized_devices set active=false')
+    expect(deviceEnrollmentMigration).toContain('update public.employee_terminal_sessions set revoked_at=now()')
   })
 })
 

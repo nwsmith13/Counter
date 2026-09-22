@@ -1,4 +1,5 @@
 export const ENROLLMENT_CODE_LENGTH = 16
+export const CANONICAL_APPLICATION_PATH = '/'
 
 export const normalizeEnrollmentCode = (input: string) => input.toUpperCase().replace(/[^0-9A-F]/g, '').slice(0, ENROLLMENT_CODE_LENGTH)
 
@@ -24,7 +25,10 @@ export const setupCodeFromUrl = (href: string) => {
 
 export const consumeSetupCode = (href: string, replaceUrl: (url: string) => void) => {
   const code = setupCodeFromUrl(href)
-  if (isCompleteEnrollmentCode(code)) replaceUrl(new URL(href).pathname)
+  // A setup link is a transport mechanism, never a durable application route.
+  // Preserve its code in memory for the confirmation screen, then remove it from
+  // both the visible URL and future history entries.
+  if (isCompleteEnrollmentCode(code)) replaceUrl(CANONICAL_APPLICATION_PATH)
   return isCompleteEnrollmentCode(code) ? code : ''
 }
 

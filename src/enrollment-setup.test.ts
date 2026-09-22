@@ -15,7 +15,7 @@ describe('fast device enrollment transport', () => {
   it('extracts only complete setup-link codes and scrubs the visible URL after capture', () => {
     const replace = vi.fn()
     expect(consumeSetupCode(`${origin}/setup?code=9b87%20f241-678e%201403`, replace)).toBe(code)
-    expect(replace).toHaveBeenCalledWith('/setup')
+    expect(replace).toHaveBeenCalledWith('/')
     expect(setupCodeFromUrl(`${origin}/setup?code=bad`)).toBe('BAD')
     expect(consumeSetupCode(`${origin}/setup?code=bad`, replace)).toBe('')
   })
