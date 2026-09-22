@@ -70,9 +70,10 @@ Verify the Vercel project uses this repository root, `npm run build`, and `dist`
 - [ ] On an existing authorized OWNER terminal, sign in as OWNER.
 - [ ] Open **Devices**, enter a friendly unique name such as `Front Counter Tablet`, and choose **Authorize New Device**.
 - [ ] Keep the one-time code private. It expires after 15 minutes and can be redeemed once.
-- [ ] On the new tablet, open `https://open.bluespringsbowl.com`.
-- [ ] Confirm **SET UP THIS DEVICE** appears.
-- [ ] Enter the one-time code on the tablet.
+- [ ] Use **Copy Setup Code**, **Share Setup**, or scan the QR code to transfer the one-time setup link to the new device. Manual entry remains available.
+- [ ] On the new tablet, open `https://open.bluespringsbowl.com` or the shared setup link.
+- [ ] Confirm **SET UP THIS DEVICE** appears. A setup link pre-fills the code and removes it from the visible address after capture.
+- [ ] Confirm the code is correct, then choose **AUTHORIZE DEVICE**. The link never auto-authorizes a device.
 - [ ] Confirm the app advances to **WHO'S WORKING?**. The device token must not be displayed.
 - [ ] Choose an employee and sign in with that employee's PIN.
 - [ ] Confirm the authoritative current board loads before any mutation control is usable.
