@@ -50,6 +50,8 @@ describe('scheduled bowling migration',()=>{
 })
 
 describe('scheduled bowling UI wiring',()=>{
+  it('passes the selected calendar date into Add Booking and preserves it across type choices',()=>{expect(main).toContain("add={selectedDateKey=>setSheet({addBooking:selectedDateKey})}");expect(main).toContain('selectedDateKey={sheet.addBooking}');expect(main).toContain('bookingInitialDateTime(selectedDate)');expect(main).toContain("onClick={()=>setType(kind)}")})
+  it('retains the non-calendar Add Booking fallback',()=>{expect(main).toContain("sheet==='ADD_BOOKING'&&<BookingEditor" )})
   it('reuses StartSheet for booked arrivals and sends the booking RPC',()=>{expect(main).toContain('<StartSheet state={state} booking={state.bookings[sheet.startBooking]}');expect(main).toContain('openPlayApi.startBooking');expect(main).toContain('Choose exactly {booking.lanesNeeded}')})
   it('exposes compact Schedule and Upcoming actions with edit/cancel',()=>{for(const text of ['Schedule','Upcoming (','ADD BOOKING','SAVE BOOKING','CANCEL BOOKING'])expect(main).toContain(text)})
   it('routes one reminder to booking detail and multiple reminders to the existing Upcoming sheet',()=>{expect(main).toContain("reminder.additionalCount?'UPCOMING':{booking:reminder.booking.id}");expect(main).toContain('function UpcomingTodayReminder');expect(main).toContain('UPCOMING TODAY')})

@@ -32,7 +32,11 @@ describe('identity pre-readiness polish', () => {
   })
 
   it('retains the OPEN startup state and reduced-motion styling without a continuous flicker loop', async () => {
-    expect(board).toContain("poweringUp?'starting':'lit'")
+    expect(board).toContain('neonPresentation.toLowerCase()')
+    expect(board).toContain("setNeonPresentation('HIDDEN')")
+    expect(board).toContain("setNeonPresentation('DARK')")
+    expect(board).toContain("setNeonPresentation('STARTUP')")
+    expect(board).toContain("setNeonPresentation('LIT')")
     expect(board).toContain("'(prefers-reduced-motion: reduce)'")
     expect(board).toContain("setNeonFlicker(false)")
     expect(board).toContain('15_000+Math.random()*20_000')
