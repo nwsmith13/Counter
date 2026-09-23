@@ -1,4 +1,4 @@
-import { defaults, type ActivityEvent, type AppState, type LaneAssignment, type LaneCondition, type League, type Night, type Session } from './domain'
+import { defaults, type ActivityEvent, type AppState, type Booking, type LaneAssignment, type LaneCondition, type League, type Night, type Session } from './domain'
 import type { SharedOpenPlaySnapshot, VersionedSession } from './open-play-api'
 import { runtimeConfiguration } from './runtime-config'
 
@@ -49,7 +49,8 @@ export const openPlaySnapshotToState = (snapshot: SharedOpenPlaySnapshot): AppSt
     return [league.id, league]
   }))
   const activity: ActivityEvent[] = array(snapshot.activity).map(row => ({ id: text(row.id), nightId: nullableText(row.nightId), occurredAt: text(row.occurredAt), type: text(row.type), sessionId: nullableText(row.sessionId), laneNumbers: Array.isArray(row.laneNumbers) ? row.laneNumbers.map(Number) : [], summary: text(row.summary), employeeId: nullableText(row.employeeId), employeeName: nullableText(row.employeeName), deviceId: nullableText(row.deviceId), details: object(row.details) }))
-  return { ...baseline, settings, currentNightId: current?.id ?? null, nights, sessions, laneAssignments, leagues, laneConditions, activity }
+  const bookings = Object.fromEntries(array(snapshot.bookings).map(row => { const booking={...row,id:text(row.id),scheduledAt:text(row.scheduledAt),leagueId:text(row.leagueId),leagueNameSnapshot:text(row.leagueNameSnapshot),teamDescription:text(row.teamDescription),lanesNeeded:Number(row.lanesNeeded),notes:nullableText(row.notes),version:Number(row.version),startedAt:nullableText(row.startedAt),startedBy:nullableText(row.startedBy),startedByName:nullableText(row.startedByName),cancelledAt:nullableText(row.cancelledAt),cancelledBy:nullableText(row.cancelledBy),cancelledByName:nullableText(row.cancelledByName),cancellationNote:nullableText(row.cancellationNote),resultingSessionId:nullableText(row.resultingSessionId)} as Booking; return [booking.id,booking] }))
+  return { ...baseline, settings, currentNightId: current?.id ?? null, nights, sessions, laneAssignments, leagues, laneConditions, activity, bookings }
 }
 
 export const readSharedOpenPlayCache = (storage: Pick<Storage, 'getItem'> = localStorage): AppState | null => {

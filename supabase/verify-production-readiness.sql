@@ -7,7 +7,8 @@ required_tables(name) as (values
   ('organizations'),('employees'),('authorized_devices'),('employee_terminal_sessions'),
   ('device_enrollment_codes'),('business_nights'),('open_play_settings'),
   ('open_play_leagues'),('open_play_sessions'),('open_play_lane_assignments'),
-  ('open_play_lane_conditions'),('open_play_activity')
+  ('open_play_lane_conditions'),('open_play_activity'),
+  ('open_play_bookings'),('open_play_booking_activity')
 ),
 required_columns(table_name,column_name) as (values
   ('organizations','slug'),('employees','role'),('employees','active'),
@@ -23,7 +24,12 @@ required_columns(table_name,column_name) as (values
   ('open_play_sessions','reinstated_by_name'),('open_play_sessions','reinstatement_note'),
   ('open_play_lane_assignments','billable_started_at'),
   ('open_play_lane_assignments','billing_group_id'),('open_play_activity','performed_by_name'),
-  ('open_play_activity','device_id'),('open_play_activity','details')
+  ('open_play_activity','device_id'),('open_play_activity','details'),
+  ('open_play_bookings','status'),('open_play_bookings','scheduled_at'),
+  ('open_play_bookings','lanes_needed'),('open_play_bookings','version'),
+  ('open_play_bookings','resulting_session_id'),
+  ('open_play_booking_activity','booking_id'),('open_play_booking_activity','type'),
+  ('open_play_booking_activity','performed_by_name'),('open_play_booking_activity','device_id')
 ),
 browser_rpcs(signature) as (values
   ('bsb_list_active_employees(text)'),('bsb_verify_employee_pin(text,uuid,text)'),
@@ -41,7 +47,11 @@ browser_rpcs(signature) as (values
   ('bsb_reinstate_session(text,text,uuid,integer,text)'),
   ('bsb_set_lane_condition(text,text,integer,bsb_open_play_lane_condition,text)'),
   ('bsb_close_night(text,text)'),('bsb_save_open_play_settings(text,text,jsonb)'),
-  ('bsb_save_open_play_league(text,text,uuid,text,boolean,integer)')
+  ('bsb_save_open_play_league(text,text,uuid,text,boolean,integer)'),
+  ('bsb_create_booking(text,text,timestamp with time zone,uuid,text,text,integer,text)'),
+  ('bsb_update_booking(text,text,uuid,integer,timestamp with time zone,uuid,text,text,integer,text)'),
+  ('bsb_cancel_booking(text,text,uuid,integer,text)'),
+  ('bsb_start_booking(text,text,uuid,integer,integer[],integer[])')
 ),
 internal_helpers(signature) as (values
   ('bsb_device(text)'),('bsb_session_employee(text)'),('bsb_open_play_actor(text,text)'),
@@ -49,14 +59,17 @@ internal_helpers(signature) as (values
   ('bsb_open_play_validate_data(bsb_open_play_session_type,jsonb)'),
   ('bsb_open_play_log(uuid,uuid,uuid,text,integer[],text,uuid)'),
   ('bsb_open_play_log_actor(bsb_open_play_actor_context,uuid,uuid,text,integer[],text,jsonb)'),
-  ('bsb_open_play_require_open_night_for_row()')
+  ('bsb_open_play_require_open_night_for_row()'),
+  ('bsb_booking_log(bsb_open_play_actor_context,uuid,text,jsonb)')
 ),
 required_indexes(name) as (values
   ('business_nights_one_open_per_organization'),
   ('open_play_one_active_assignment_per_lane'),
   ('device_enrollment_codes_code_hash_key'),
   ('authorized_devices_token_hash_key'),
-  ('employee_terminal_sessions_token_hash_key')
+  ('employee_terminal_sessions_token_hash_key'),
+  ('open_play_bookings_upcoming'),
+  ('open_play_bookings_resulting_session_id_key')
 ),
 required_constraints(table_name,name) as (values
   ('open_play_sessions','open_play_sessions_void_context'),
@@ -72,7 +85,9 @@ enum_expectations(type_name, expected) as (values
   ('bsb_open_play_session_type','OPEN_BOWLING,PARTY,PRE_POST'),
   ('bsb_open_play_session_status','ACTIVE,AWAITING_CLOSE,COMPLETED,VOIDED'),
   ('bsb_open_play_lane_condition','AVAILABLE,DOWN,WATCH'),
-  ('bsb_open_play_lane_end_reason','MOVED,RELEASED,SESSION_ENDED')
+  ('bsb_open_play_lane_end_reason','MOVED,RELEASED,SESSION_ENDED'),
+  ('bsb_booking_type','PRE_POST'),
+  ('bsb_booking_status','CANCELLED,SCHEDULED,STARTED')
 ),
 checks as (
   select '01 required tables' check_name,
@@ -166,6 +181,27 @@ checks as (
     from pg_proc p join pg_namespace n on n.oid=p.pronamespace
     where n.nspname='public' and p.prosecdef
       and not coalesce(p.proconfig,'{}'::text[]) @> array['search_path=public, pg_temp']
+  union all
+  select '22 booking structural constraints',
+    (select count(*) from pg_constraint c where c.conrelid=to_regclass('public.open_play_bookings') and c.contype='c'
+      and (pg_get_constraintdef(c.oid) ilike '%lanes_needed >= 1%' or pg_get_constraintdef(c.oid) ilike '%lanes_needed%between 1 and 12%'))>=1
+    and (select count(*) from pg_constraint c where c.conrelid=to_regclass('public.open_play_bookings') and c.contype='c'
+      and pg_get_constraintdef(c.oid) ilike '%status%SCHEDULED%' and pg_get_constraintdef(c.oid) ilike '%resulting_session_id%')>=1,
+    'requires 1-12 lanes and status/resulting-session lifecycle consistency'
+  union all
+  select '23 started bookings have a resulting session', count(*)=0, count(*)||' violating booking(s)'
+    from public.open_play_bookings b where b.status='STARTED' and b.resulting_session_id is null
+  union all
+  select '24 unstarted bookings have no resulting session', count(*)=0, count(*)||' violating booking(s)'
+    from public.open_play_bookings b where b.status in ('SCHEDULED','CANCELLED') and b.resulting_session_id is not null
+  union all
+  select '25 booking/session organization matches', count(*)=0, count(*)||' mismatched booking/session row(s)'
+    from public.open_play_bookings b join public.open_play_sessions s on s.id=b.resulting_session_id
+    where b.organization_id<>s.organization_id or b.status<>'STARTED' or s.type<>'PRE_POST'
+  union all
+  select '26 booking activity ownership matches', count(*)=0, count(*)||' mismatched booking activity row(s)'
+    from public.open_play_booking_activity a join public.open_play_bookings b on b.id=a.booking_id
+    where a.organization_id<>b.organization_id
 )
 select check_name, case when ok then 'PASS' else 'FAIL' end status, detail
 from checks order by check_name;
