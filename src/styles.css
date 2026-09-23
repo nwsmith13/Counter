@@ -157,3 +157,6 @@ header>.nav>button .nav-icon{width:15px;height:15px;flex:0 0 15px}
 header>.employee-control{min-width:0;flex:0 0 auto}
 header>.employee-control>button{min-height:38px;padding:8px 10px;border-radius:6px;white-space:nowrap;font-size:.8rem;line-height:1.1}
 @media(max-width:850px){header>.nav{gap:5px}header>.nav>button{min-height:36px;padding:7px 8px;font-size:.74rem}header>.employee-control>button{min-height:36px;padding:7px 9px;font-size:.74rem}}
+
+/* An overdue booking needs a quiet, unmistakable lower edge on the board. */
+.upcoming-today.waiting{border-color:#e4ae3e;border-left-color:#f2b84b;border-bottom:3px solid #f4c451}
