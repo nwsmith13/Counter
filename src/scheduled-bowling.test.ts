@@ -2,7 +2,7 @@ import { describe,expect,it } from 'vitest'
 import migration from '../supabase/migrations/202609220005_scheduled_bowling.sql?raw'
 import verifier from '../supabase/verify-production-readiness.sql?raw'
 import main from './main.tsx?raw'
-import { bookingDraft,scheduledBookings,todayBookings } from './bookings'
+import { bookingDraft,scheduledBookings,todayBookings,todayReminder } from './bookings'
 import type { Booking } from './domain'
 
 const booking=(id:string,scheduledAt:string,status:Booking['status']='SCHEDULED'):Booking=>({id,type:'PRE_POST',status,scheduledAt,leagueId:'league',leagueNameSnapshot:'Thursday Match Point',designation:'PRE',teamDescription:'Smith Team',lanesNeeded:2,notes:null,createdAt:scheduledAt,createdBy:'employee',createdByName:'Employee',updatedAt:scheduledAt,updatedBy:'employee',updatedByName:'Employee',version:1,startedAt:null,startedBy:null,startedByName:null,cancelledAt:null,cancelledBy:null,cancelledByName:null,cancellationNote:null,resultingSessionId:null})
@@ -11,6 +11,16 @@ describe('scheduled bowling domain',()=>{
   it('orders upcoming chronologically and excludes cancelled/started bookings',()=>{const rows=scheduledBookings({b:booking('b','2026-09-24T16:00:00Z'),a:booking('a','2026-09-23T16:00:00Z'),c:booking('c','2026-09-22T16:00:00Z','CANCELLED')});expect(rows.map(row=>row.id)).toEqual(['a','b'])})
   it('identifies today using the counter device local date',()=>{const now=new Date(2026,8,23,9);const same=new Date(2026,8,23,18).toISOString();const next=new Date(2026,8,24,9).toISOString();expect(todayBookings({same:booking('same',same),next:booking('next',next)},now).map(row=>row.id)).toEqual(['same'])})
   it('normalizes editor input without physical lanes',()=>{const draft=bookingDraft('2026-09-26T11:00','league','POST','  Jones  ',2,'  call desk  ');expect(draft).toMatchObject({leagueId:'league',designation:'POST',teamDescription:'Jones',lanesNeeded:2,notes:'call desk'});expect(draft).not.toHaveProperty('lanes')})
+})
+
+describe('Upcoming Today reminder',()=>{
+  const at=(day:number,hour:number,minute=0)=>new Date(2026,8,day,hour,minute).toISOString()
+  const now=new Date(2026,8,23,10,0)
+  it('does not create a strip when no scheduled booking is today',()=>{expect(todayReminder({},now)).toBeNull();expect(todayReminder({tomorrow:booking('tomorrow',at(24,10))},now)).toBeNull();expect(todayReminder({yesterday:booking('yesterday',at(22,10))},now)).toBeNull()})
+  it('selects today’s scheduled booking and omits cancelled and started records',()=>{const result=todayReminder({scheduled:booking('scheduled',at(23,13)),cancelled:booking('cancelled',at(23,11),'CANCELLED'),started:booking('started',at(23,9),'STARTED')},now);expect(result).toMatchObject({booking:{id:'scheduled'},additionalCount:0,urgency:'NORMAL'})})
+  it('adds stronger emphasis within sixty minutes and waiting after its time',()=>{expect(todayReminder({soon:booking('soon',at(23,11))},now)?.urgency).toBe('SOON');expect(todayReminder({due:booking('due',at(23,10))},now)?.urgency).toBe('WAITING');expect(todayReminder({late:booking('late',at(23,9,59))},now)?.urgency).toBe('WAITING')})
+  it('keeps multiple bookings compact by selecting the earliest and counting the rest',()=>{const result=todayReminder({later:booking('later',at(23,15)),first:booking('first',at(23,11)),middle:booking('middle',at(23,13))},now);expect(result).toMatchObject({booking:{id:'first'},additionalCount:2})})
+  it('disappears after the authoritative state changes the final booking to STARTED',()=>{const rows={today:booking('today',at(23,11))};expect(todayReminder(rows,now)).not.toBeNull();expect(todayReminder({...rows,today:booking('today',at(23,11),'STARTED')},now)).toBeNull()})
 })
 
 describe('scheduled bowling migration',()=>{
@@ -28,6 +38,7 @@ describe('scheduled bowling migration',()=>{
 describe('scheduled bowling UI wiring',()=>{
   it('reuses StartSheet for booked arrivals and sends the booking RPC',()=>{expect(main).toContain('<StartSheet state={state} booking={state.bookings[sheet.startBooking]}');expect(main).toContain('openPlayApi.startBooking');expect(main).toContain('Choose exactly {booking.lanesNeeded}')})
   it('exposes compact Schedule and Upcoming actions with edit/cancel',()=>{for(const text of ['Schedule','Upcoming (','ADD BOOKING','SAVE BOOKING','CANCEL BOOKING'])expect(main).toContain(text)})
+  it('routes one reminder to booking detail and multiple reminders to the existing Upcoming sheet',()=>{expect(main).toContain("reminder.additionalCount?'UPCOMING':{booking:reminder.booking.id}");expect(main).toContain('function UpcomingTodayReminder');expect(main).toContain('UPCOMING TODAY')})
 })
 
 describe('scheduled bowling production verifier',()=>{
