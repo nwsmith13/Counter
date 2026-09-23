@@ -27,7 +27,7 @@ describe('Slice 8 counter presentation', () => {
 
   it('has an accessible reduced-motion path for the irregular neon flicker', () => {
     expect(app).toContain("prefers-reduced-motion: reduce")
-    expect(app).toContain("45_000+Math.random()*45_000")
+    expect(app).toContain("15_000+Math.random()*20_000")
   })
 
   it('keeps the footer identity and removes the standalone PLAY header label', () => {

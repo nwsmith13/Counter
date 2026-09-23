@@ -53,8 +53,9 @@ export const identityApi = {
     const value = await rpc<Record<string, unknown>>('bsb_owner_save_employee', { p_session_token: sessionToken, p_employee_id: input.id ?? null, p_display_name: input.displayName, p_role: input.role, p_active: input.active, p_pin: input.pin ?? null })
     return employeeFrom(value)
   },
-  listDevices: (sessionToken: string) => rpc<{ id:string; display_name:string; active:boolean; last_seen_at:string|null; created_at:string }[]>('bsb_owner_list_devices',{p_session_token:sessionToken}),
+  listDevices: (sessionToken: string) => rpc<{ id:string; display_name:string; active:boolean; last_seen_at:string|null; created_at:string; is_current:boolean }[]>('bsb_owner_list_devices_with_current',{p_session_token:sessionToken}),
   createDeviceEnrollment: (sessionToken:string, deviceName:string) => rpc<{code:string;expires_at:string;device_name:string}>('bsb_owner_create_device_enrollment',{p_session_token:sessionToken,p_device_name:deviceName}),
   redeemDeviceEnrollment: (code:string) => rpc<{device_token:string;device_name:string}>('bsb_redeem_device_enrollment',{p_code:code}),
   setDeviceActive: (sessionToken:string,id:string,active:boolean) => rpc<void>('bsb_owner_set_device_active',{p_session_token:sessionToken,p_device_id:id,p_active:active}),
+  renameDevice: (sessionToken:string,id:string,displayName:string) => rpc<{ id:string; display_name:string }>('bsb_owner_rename_device',{p_session_token:sessionToken,p_device_id:id,p_display_name:displayName}),
 }

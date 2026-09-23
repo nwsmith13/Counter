@@ -39,5 +39,7 @@ export const clearTerminalSession = (storage: Pick<Storage, 'removeItem'> = loca
 
 export const canManageEmployees = (employee: Employee | null) => employee?.role === 'OWNER'
 export const canManageDevices = (employee: Employee | null) => employee?.role === 'OWNER' || employee?.role === 'MANAGER'
+export const canRenameDevices = canManageDevices
 export const canRemoveDeviceAccess = (employee: Employee | null) => employee?.role === 'OWNER'
 export const isValidPinFormat = (pin: string) => /^\d{4}$/.test(pin)
+export const isValidDeviceName = (name: string) => { const trimmed=name.trim(); return trimmed.length > 0 && trimmed.length <= 80 }
