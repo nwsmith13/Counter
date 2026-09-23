@@ -38,6 +38,12 @@ export const isIdentityFailure = (error: unknown) => {
   return /unauthorized (terminal session|device)|session (expired|revoked)|device (deactivated|revoked)|authorization revoked/i.test(message)
 }
 
+export const CLOSED_NIGHT_MESSAGE = 'This night has already been closed. Past sessions can no longer be changed.'
+export const isClosedNightFailure = (error: unknown) => {
+  const message = error instanceof Error ? error.message : String(error)
+  return /BSB03|night has already been closed|past sessions can no longer be changed/i.test(message)
+}
+
 export const isConnectivityFailure = (error: unknown) => {
   const message = error instanceof Error ? error.message : String(error)
   return error instanceof TypeError || /failed to fetch|networkerror|network request|load failed|fetch failed|connection (refused|closed)|timeout|timed out/i.test(message)

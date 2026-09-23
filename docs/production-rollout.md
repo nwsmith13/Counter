@@ -29,8 +29,21 @@ The repository migration order is:
 6. `202609210006_open_play_authoritative_audit.sql`
 7. `202609210007_open_play_payment_and_void.sql`
 8. `202609210008_open_play_session_milestone_snapshot.sql`
+9. `202609220001_close_night_void_guard_fix.sql`
+10. `202609220002_trusted_device_experience.sql`
+11. `202609220003_device_rename.sql`
+12. `202609220004_closed_night_immutability.sql`
 
 These files are ordered dependencies, not a list to rerun blindly. In the Supabase Dashboard, compare production migration history and database objects with this list and the verification report. Apply only migrations proven missing, in order, using the normal Supabase migration process. If history and actual objects disagree, stop and reconcile them before applying anything.
+
+The closed-night immutability migration makes `open_play_sessions` and
+`open_play_lane_assignments` read-only once their owning business night closes.
+Lane conditions, pricing/settings, leagues, employees, and devices are
+organization-level operational or administrative state rather than historical
+night rows, so they intentionally remain outside that barrier. Opening a night
+creates the night row; starting a session is protected when its session and lane
+rows are inserted. Post-close corrections are not supported—use a future
+separately audited adjustment workflow rather than changing an archived night.
 
 After applying a missing migration, rerun `supabase/verify-production-readiness.sql`. Continue only when every row is `PASS`. Never run `supabase/bootstrap.sql` in production; initial identity bootstrapping is retired and additional devices use the in-app enrollment flow.
 

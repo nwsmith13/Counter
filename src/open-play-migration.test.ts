@@ -6,6 +6,7 @@ import voidMigration from '../supabase/migrations/202609210007_open_play_payment
 import milestoneSnapshotMigration from '../supabase/migrations/202609210008_open_play_session_milestone_snapshot.sql?raw'
 import closeNightGuardFix from '../supabase/migrations/202609220001_close_night_void_guard_fix.sql?raw'
 import deviceEnrollmentMigration from '../supabase/migrations/202609210005_device_enrollment.sql?raw'
+import closedNightMigration from '../supabase/migrations/202609220004_closed_night_immutability.sql?raw'
 
 describe('shared Open Play migration foundation', () => {
   it('creates the reduced operational tables with direct browser access restricted', () => {
@@ -161,4 +162,30 @@ describe('authoritative Open Play audit migration', () => {
     expect(checkout.indexOf("raise exception 'Charged total is required at checkout'")).toBeLessThan(checkout.indexOf('bsb_open_play_log_actor'))
     expect(checkout.indexOf("set status='COMPLETED'")).toBeLessThan(checkout.indexOf('bsb_open_play_log_actor'))
   })
+})
+
+describe('closed-night immutability barrier', () => {
+  it('uses one night-row FOR UPDATE barrier for session and assignment writes', () => {
+    expect(closedNightMigration).toContain('create or replace function public.bsb_open_play_require_open_night_for_row()')
+    expect(closedNightMigration).toContain('from public.business_nights')
+    expect(closedNightMigration).toContain('for update;')
+    expect(closedNightMigration).toContain("v_night.status <> 'OPEN'")
+    expect(closedNightMigration).toContain("errcode='BSB03'")
+    expect(closedNightMigration).toContain('before insert or update or delete on public.open_play_sessions')
+    expect(closedNightMigration).toContain('before insert or update or delete on public.open_play_lane_assignments')
+  })
+
+  it('keeps the barrier internal and hardens reopen lifecycle states', () => {
+    expect(closedNightMigration).toContain('revoke all on function public.bsb_open_play_require_open_night_for_row() from public, anon, authenticated')
+    expect(closedNightMigration).toContain("s.status not in ('AWAITING_CLOSE','COMPLETED')")
+    expect(closedNightMigration).not.toContain("s.status='VOIDED'")
+    expect(closedNightMigration).toContain('grant execute on function public.bsb_reopen_session(text,text,uuid,integer,jsonb) to anon')
+  })
+
+  it.each(['edit','add lane','move lane','release lane','start billing','end','payment','reopen','void','reinstate'])(
+    'statically maps Close Night versus %s to the shared table-write barrier', () => {
+      expect(closedNightMigration.match(/create trigger bsb_open_play_(sessions|lane_assignments)_open_night_barrier/g)).toHaveLength(2)
+      expect(closeNightGuardFix).toContain("status='OPEN' for update")
+    },
+  )
 })

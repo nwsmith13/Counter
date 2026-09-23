@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { assertConnectedBackendMutationAllowed, assertSharedMutationAllowed, canDisplaySharedBoard, isConnectivityFailure, isIdentityFailure, OFFLINE_MUTATION_MESSAGE, publishSharedConnectionState, SharedConnectionTracker } from './connection-safety'
+import { assertConnectedBackendMutationAllowed, assertSharedMutationAllowed, canDisplaySharedBoard, CLOSED_NIGHT_MESSAGE, isClosedNightFailure, isConnectivityFailure, isIdentityFailure, OFFLINE_MUTATION_MESSAGE, publishSharedConnectionState, SharedConnectionTracker } from './connection-safety'
 
 describe('shared connection safety', () => {
   it('becomes connected after a successful authoritative request', () => {
@@ -48,5 +48,11 @@ describe('shared connection safety', () => {
     expect(isIdentityFailure(new TypeError('Failed to fetch'))).toBe(false)
     expect(isConnectivityFailure(new TypeError('Failed to fetch'))).toBe(true)
     expect(isConnectivityFailure(new Error('Stale session'))).toBe(false)
+  })
+
+  it('classifies a closed-night rejection separately from connectivity failures', () => {
+    const error = new Error(CLOSED_NIGHT_MESSAGE)
+    expect(isClosedNightFailure(error)).toBe(true)
+    expect(isConnectivityFailure(error)).toBe(false)
   })
 })

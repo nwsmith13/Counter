@@ -12,12 +12,16 @@ required_tables(name) as (values
 required_columns(table_name,column_name) as (values
   ('organizations','slug'),('employees','role'),('employees','active'),
   ('authorized_devices','token_hash'),('authorized_devices','active'),
+  ('authorized_devices','updated_at'),
   ('employee_terminal_sessions','expires_at'),('employee_terminal_sessions','revoked_at'),
   ('device_enrollment_codes','code_hash'),('device_enrollment_codes','expires_at'),('device_enrollment_codes','used_at'),
   ('business_nights','status'),('open_play_settings','settings'),('open_play_leagues','sort_order'),
   ('open_play_sessions','status'),('open_play_sessions','version'),('open_play_sessions','checked_out_at'),
   ('open_play_sessions','voided_at'),('open_play_sessions','void_category'),('open_play_sessions','pre_void_status'),
-  ('open_play_sessions','reinstated_at'),('open_play_lane_assignments','billable_started_at'),
+  ('open_play_sessions','voided_by'),('open_play_sessions','voided_by_name'),('open_play_sessions','void_note'),
+  ('open_play_sessions','reinstated_at'),('open_play_sessions','reinstated_by'),
+  ('open_play_sessions','reinstated_by_name'),('open_play_sessions','reinstatement_note'),
+  ('open_play_lane_assignments','billable_started_at'),
   ('open_play_lane_assignments','billing_group_id'),('open_play_activity','performed_by_name'),
   ('open_play_activity','device_id'),('open_play_activity','details')
 ),
@@ -25,6 +29,7 @@ browser_rpcs(signature) as (values
   ('bsb_list_active_employees(text)'),('bsb_verify_employee_pin(text,uuid,text)'),
   ('bsb_owner_list_employees(text)'),('bsb_owner_save_employee(text,uuid,text,bsb_employee_role,boolean,text)'),
   ('bsb_owner_list_devices(text)'),('bsb_owner_create_device_enrollment(text,text)'),
+  ('bsb_owner_list_devices_with_current(text)'),('bsb_owner_rename_device(text,uuid,text)'),
   ('bsb_redeem_device_enrollment(text)'),('bsb_owner_set_device_active(text,uuid,boolean)'),
   ('bsb_get_open_play_state(text,text)'),('bsb_open_night(text,text)'),
   ('bsb_start_session(text,text,bsb_open_play_session_type,jsonb,integer[],integer[])'),
@@ -43,7 +48,23 @@ internal_helpers(signature) as (values
   ('bsb_open_play_require_actor(text,text)'),('bsb_open_play_assert_money(jsonb,text,boolean)'),
   ('bsb_open_play_validate_data(bsb_open_play_session_type,jsonb)'),
   ('bsb_open_play_log(uuid,uuid,uuid,text,integer[],text,uuid)'),
-  ('bsb_open_play_log_actor(bsb_open_play_actor_context,uuid,uuid,text,integer[],text,jsonb)')
+  ('bsb_open_play_log_actor(bsb_open_play_actor_context,uuid,uuid,text,integer[],text,jsonb)'),
+  ('bsb_open_play_require_open_night_for_row()')
+),
+required_indexes(name) as (values
+  ('business_nights_one_open_per_organization'),
+  ('open_play_one_active_assignment_per_lane'),
+  ('device_enrollment_codes_code_hash_key'),
+  ('authorized_devices_token_hash_key'),
+  ('employee_terminal_sessions_token_hash_key')
+),
+required_constraints(table_name,name) as (values
+  ('open_play_sessions','open_play_sessions_void_context'),
+  ('open_play_sessions','open_play_sessions_reinstatement_context')
+),
+required_triggers(table_name,name) as (values
+  ('open_play_sessions','bsb_open_play_sessions_open_night_barrier'),
+  ('open_play_lane_assignments','bsb_open_play_lane_assignments_open_night_barrier')
 ),
 enum_expectations(type_name, expected) as (values
   ('bsb_employee_role','EMPLOYEE,MANAGER,OWNER'),
@@ -87,6 +108,64 @@ checks as (
   select '09 active OWNER', count(*)>=1, count(*)||' active owner(s)' from public.employees e join public.organizations o on o.id=e.organization_id where o.slug='blue-springs-bowl' and e.active and e.role='OWNER'
   union all
   select '10 active authorized device', count(*)>=1, count(*)||' active authorized device(s)' from public.authorized_devices d join public.organizations o on o.id=d.organization_id where o.slug='blue-springs-bowl' and d.active
+  union all
+  select '11 required operational indexes',
+    not exists(select 1 from required_indexes r left join pg_class c on c.relname=r.name and c.relkind='i' left join pg_namespace n on n.oid=c.relnamespace and n.nspname='public' where c.oid is null or n.oid is null),
+    coalesce((select string_agg(r.name,', ') from required_indexes r left join pg_class c on c.relname=r.name and c.relkind='i' left join pg_namespace n on n.oid=c.relnamespace and n.nspname='public' where c.oid is null or n.oid is null),'all present')
+  union all
+  select '12 required lifecycle constraints',
+    not exists(select 1 from required_constraints r left join pg_constraint c on c.conrelid=to_regclass('public.'||r.table_name) and c.conname=r.name where c.oid is null),
+    coalesce((select string_agg(r.table_name||'.'||r.name,', ') from required_constraints r left join pg_constraint c on c.conrelid=to_regclass('public.'||r.table_name) and c.conname=r.name where c.oid is null),'all present')
+  union all
+  select '13 closed-night barrier triggers',
+    not exists(select 1 from required_triggers r left join pg_trigger t on t.tgrelid=to_regclass('public.'||r.table_name) and t.tgname=r.name and not t.tgisinternal where t.oid is null or not t.tgenabled in ('O','A')),
+    coalesce((select string_agg(r.table_name||'.'||r.name,', ') from required_triggers r left join pg_trigger t on t.tgrelid=to_regclass('public.'||r.table_name) and t.tgname=r.name and not t.tgisinternal where t.oid is null or not t.tgenabled in ('O','A')),'both enabled')
+  union all
+  select '14 no unresolved sessions in closed nights', count(*)=0, count(*)||' violating session(s)'
+    from public.open_play_sessions s join public.business_nights n on n.id=s.night_id
+    where n.status='CLOSED' and s.status in ('ACTIVE','AWAITING_CLOSE')
+  union all
+  select '15 no active assignments in closed nights', count(*)=0, count(*)||' violating assignment(s)'
+    from public.open_play_lane_assignments a join public.business_nights n on n.id=a.night_id
+    where n.status='CLOSED' and a.ended_at is null
+  union all
+  select '16 active assignments belong to active sessions', count(*)=0, count(*)||' violating assignment(s)'
+    from public.open_play_lane_assignments a join public.open_play_sessions s on s.id=a.session_id
+    where a.ended_at is null and s.status<>'ACTIVE'
+  union all
+  select '17 organization/night/session ownership matches', count(*)=0, count(*)||' mismatched row(s)'
+    from (
+      select s.id from public.open_play_sessions s join public.business_nights n on n.id=s.night_id
+        where s.organization_id<>n.organization_id
+      union all
+      select a.id from public.open_play_lane_assignments a
+        join public.open_play_sessions s on s.id=a.session_id
+        join public.business_nights n on n.id=a.night_id
+        where a.organization_id<>s.organization_id or a.night_id<>s.night_id
+          or a.organization_id<>n.organization_id or s.organization_id<>n.organization_id
+    ) mismatches
+  union all
+  select '18 completed Open Bowling has payment', count(*)=0, count(*)||' completed session(s) missing payment'
+    from public.open_play_sessions s where s.status='COMPLETED' and s.type='OPEN_BOWLING'
+      and (not (s.data->'pricing' ? 'chargedTotalCents') or s.data->'pricing'->'chargedTotalCents'='null'::jsonb)
+  union all
+  select '19 every organization has an active OWNER', count(*)=0, count(*)||' organization(s) without an active owner'
+    from public.organizations o where not exists(select 1 from public.employees e where e.organization_id=o.id and e.active and e.role='OWNER')
+  union all
+  select '20 internal helpers denied to PUBLIC and browser roles',
+    not exists(select 1 from internal_helpers r where to_regprocedure('public.'||r.signature) is null
+      or coalesce(has_function_privilege('anon',to_regprocedure('public.'||r.signature),'EXECUTE'),false)
+      or coalesce(has_function_privilege('authenticated',to_regprocedure('public.'||r.signature),'EXECUTE'),false)
+      or exists(select 1 from pg_proc p cross join lateral aclexplode(coalesce(p.proacl,acldefault('f',p.proowner))) a where p.oid=to_regprocedure('public.'||r.signature) and a.grantee=0 and a.privilege_type='EXECUTE')),
+    coalesce((select string_agg(signature,', ') from internal_helpers r where to_regprocedure('public.'||r.signature) is null
+      or coalesce(has_function_privilege('anon',to_regprocedure('public.'||r.signature),'EXECUTE'),false)
+      or coalesce(has_function_privilege('authenticated',to_regprocedure('public.'||r.signature),'EXECUTE'),false)
+      or exists(select 1 from pg_proc p cross join lateral aclexplode(coalesce(p.proacl,acldefault('f',p.proowner))) a where p.oid=to_regprocedure('public.'||r.signature) and a.grantee=0 and a.privilege_type='EXECUTE')),'all present and restricted')
+  union all
+  select '21 SECURITY DEFINER search paths fixed', count(*)=0, count(*)||' function(s) missing public, pg_temp search_path'
+    from pg_proc p join pg_namespace n on n.oid=p.pronamespace
+    where n.nspname='public' and p.prosecdef
+      and not coalesce(p.proconfig,'{}'::text[]) @> array['search_path=public, pg_temp']
 )
 select check_name, case when ok then 'PASS' else 'FAIL' end status, detail
 from checks order by check_name;
