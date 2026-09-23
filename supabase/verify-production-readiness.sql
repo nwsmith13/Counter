@@ -28,6 +28,8 @@ required_columns(table_name,column_name) as (values
   ('open_play_bookings','status'),('open_play_bookings','scheduled_at'),
   ('open_play_bookings','lanes_needed'),('open_play_bookings','version'),
   ('open_play_bookings','resulting_session_id'),
+  ('open_play_bookings','party_name'),('open_play_bookings','party_amount_cents'),
+  ('open_play_bookings','customer_name'),('open_play_bookings','expected_bowlers'),
   ('open_play_booking_activity','booking_id'),('open_play_booking_activity','type'),
   ('open_play_booking_activity','performed_by_name'),('open_play_booking_activity','device_id')
 ),
@@ -52,6 +54,9 @@ browser_rpcs(signature) as (values
   ('bsb_update_booking(text,text,uuid,integer,timestamp with time zone,uuid,text,text,integer,text)'),
   ('bsb_cancel_booking(text,text,uuid,integer,text)'),
   ('bsb_start_booking(text,text,uuid,integer,integer[],integer[])')
+  ,('bsb_create_bowling_booking(text,text,bsb_booking_type,timestamp with time zone,uuid,text,text,text,integer,text,integer,integer,text)')
+  ,('bsb_update_bowling_booking(text,text,uuid,integer,bsb_booking_type,timestamp with time zone,uuid,text,text,text,integer,text,integer,integer,text)')
+  ,('bsb_start_bowling_booking(text,text,uuid,integer,integer[],integer[],integer,integer)')
 ),
 internal_helpers(signature) as (values
   ('bsb_device(text)'),('bsb_session_employee(text)'),('bsb_open_play_actor(text,text)'),
@@ -69,6 +74,7 @@ required_indexes(name) as (values
   ('authorized_devices_token_hash_key'),
   ('employee_terminal_sessions_token_hash_key'),
   ('open_play_bookings_upcoming'),
+  ('open_play_bookings_calendar'),
   ('open_play_bookings_resulting_session_id_key')
 ),
 required_constraints(table_name,name) as (values
@@ -86,7 +92,7 @@ enum_expectations(type_name, expected) as (values
   ('bsb_open_play_session_status','ACTIVE,AWAITING_CLOSE,COMPLETED,VOIDED'),
   ('bsb_open_play_lane_condition','AVAILABLE,DOWN,WATCH'),
   ('bsb_open_play_lane_end_reason','MOVED,RELEASED,SESSION_ENDED'),
-  ('bsb_booking_type','PRE_POST'),
+  ('bsb_booking_type','OPEN_PLAY,PARTY,PRE_POST'),
   ('bsb_booking_status','CANCELLED,SCHEDULED,STARTED')
 ),
 checks as (
@@ -197,11 +203,20 @@ checks as (
   union all
   select '25 booking/session organization matches', count(*)=0, count(*)||' mismatched booking/session row(s)'
     from public.open_play_bookings b join public.open_play_sessions s on s.id=b.resulting_session_id
-    where b.organization_id<>s.organization_id or b.status<>'STARTED' or s.type<>'PRE_POST'
+    where b.organization_id<>s.organization_id or b.status<>'STARTED' or s.type<>case b.type when 'OPEN_PLAY' then 'OPEN_BOWLING'::public.bsb_open_play_session_type when 'PARTY' then 'PARTY'::public.bsb_open_play_session_type else 'PRE_POST'::public.bsb_open_play_session_type end
   union all
   select '26 booking activity ownership matches', count(*)=0, count(*)||' mismatched booking activity row(s)'
     from public.open_play_booking_activity a join public.open_play_bookings b on b.id=a.booking_id
     where a.organization_id<>b.organization_id
+  union all
+  select '27 legacy PRE_POST bookings remain structurally valid', count(*)=0, count(*)||' invalid PRE_POST booking(s)'
+    from public.open_play_bookings b where b.type='PRE_POST' and (b.league_id is null or b.league_name_snapshot is null or b.designation not in ('PRE','POST') or b.team_description is null)
+  union all
+  select '28 type-specific booking details are valid', count(*)=0, count(*)||' invalid typed booking(s)'
+    from public.open_play_bookings b where (b.type='PARTY' and (b.party_name is null or b.party_amount_cents is null)) or (b.type='OPEN_PLAY' and b.customer_name is null)
+  union all
+  select '29 booking audit lifecycle types only', count(*)=0, count(*)||' invalid booking audit row(s)'
+    from public.open_play_booking_activity where type not in ('BOOKING_CREATED','BOOKING_UPDATED','BOOKING_CANCELLED','BOOKING_STARTED')
 )
 select check_name, case when ok then 'PASS' else 'FAIL' end status, detail
 from checks order by check_name;

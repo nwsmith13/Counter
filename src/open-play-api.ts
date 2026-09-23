@@ -1,5 +1,6 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import type { Booking, LaneConditionKind, Session, SessionType, Settings } from './domain'
+import type { BookingDraft } from './bookings'
 import { runtimeConfiguration } from './runtime-config'
 
 const url = runtimeConfiguration.supabaseUrl
@@ -43,8 +44,8 @@ export const openPlayApi = {
   closeNight: (c: OpenPlayCredentials) => call('bsb_close_night', auth(c)),
   saveSettings: (c: OpenPlayCredentials, settings: Settings) => call('bsb_save_open_play_settings', { ...auth(c), p_settings: settings }),
   saveLeague: (c: OpenPlayCredentials, league: { id?: string; name: string; active: boolean; sortOrder: number }) => call('bsb_save_open_play_league', { ...auth(c), p_league_id: league.id ?? null, p_name: league.name, p_active: league.active, p_sort_order: league.sortOrder }),
-  createBooking: (c: OpenPlayCredentials, booking: Pick<Booking,'scheduledAt'|'leagueId'|'designation'|'teamDescription'|'lanesNeeded'|'notes'>) => call('bsb_create_booking', { ...auth(c), p_scheduled_at: booking.scheduledAt, p_league_id: booking.leagueId, p_designation: booking.designation, p_team_description: booking.teamDescription, p_lanes_needed: booking.lanesNeeded, p_notes: booking.notes }),
-  updateBooking: (c: OpenPlayCredentials, booking: Booking, patch: Pick<Booking,'scheduledAt'|'leagueId'|'designation'|'teamDescription'|'lanesNeeded'|'notes'>) => call('bsb_update_booking', { ...auth(c), p_booking_id: booking.id, p_expected_version: booking.version, p_scheduled_at: patch.scheduledAt, p_league_id: patch.leagueId, p_designation: patch.designation, p_team_description: patch.teamDescription, p_lanes_needed: patch.lanesNeeded, p_notes: patch.notes }),
+  createBooking: (c: OpenPlayCredentials, booking: BookingDraft) => call('bsb_create_bowling_booking', { ...auth(c), p_type:booking.type,p_scheduled_at: booking.scheduledAt, p_league_id: booking.leagueId, p_designation: booking.designation, p_team_description: booking.teamDescription,p_party_name:booking.partyName,p_party_amount_cents:booking.partyAmountCents,p_customer_name:booking.customerName,p_expected_bowlers:booking.expectedBowlers, p_lanes_needed: booking.lanesNeeded, p_notes: booking.notes }),
+  updateBooking: (c: OpenPlayCredentials, booking: Booking, patch: BookingDraft) => call('bsb_update_bowling_booking', { ...auth(c), p_booking_id: booking.id, p_expected_version: booking.version,p_type:patch.type, p_scheduled_at: patch.scheduledAt, p_league_id: patch.leagueId, p_designation: patch.designation, p_team_description: patch.teamDescription,p_party_name:patch.partyName,p_party_amount_cents:patch.partyAmountCents,p_customer_name:patch.customerName,p_expected_bowlers:patch.expectedBowlers, p_lanes_needed: patch.lanesNeeded, p_notes: patch.notes }),
   cancelBooking: (c: OpenPlayCredentials, booking: Booking, note: string) => call('bsb_cancel_booking', { ...auth(c), p_booking_id: booking.id, p_expected_version: booking.version, p_note: note }),
-  startBooking: (c: OpenPlayCredentials, booking: Booking, lanes: number[], downOverrides: number[]) => call('bsb_start_booking', { ...auth(c), p_booking_id: booking.id, p_expected_version: booking.version, p_lanes: lanes, p_down_overrides: downOverrides }),
+  startBooking: (c: OpenPlayCredentials, booking: Booking, lanes: number[], downOverrides: number[],actualBowlers?:number,actualShoes?:number) => call('bsb_start_bowling_booking', { ...auth(c), p_booking_id: booking.id, p_expected_version: booking.version, p_lanes: lanes, p_down_overrides: downOverrides,p_actual_bowlers:actualBowlers??null,p_actual_shoes:actualShoes??null }),
 }

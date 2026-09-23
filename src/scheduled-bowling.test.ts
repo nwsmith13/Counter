@@ -1,16 +1,30 @@
 import { describe,expect,it } from 'vitest'
 import migration from '../supabase/migrations/202609220005_scheduled_bowling.sql?raw'
+import scheduleEnumMigration from '../supabase/migrations/202609230001_bowling_schedule.sql?raw'
+import scheduleMigration from '../supabase/migrations/202609230002_bowling_schedule_contract.sql?raw'
 import verifier from '../supabase/verify-production-readiness.sql?raw'
 import main from './main.tsx?raw'
-import { bookingDraft,scheduledBookings,todayBookings,todayReminder } from './bookings'
+import { bookingDraft,bookingsForDate,monthGrid,scheduledBookings,scheduledDateKeys,todayBookings,todayReminder } from './bookings'
 import type { Booking } from './domain'
 
-const booking=(id:string,scheduledAt:string,status:Booking['status']='SCHEDULED'):Booking=>({id,type:'PRE_POST',status,scheduledAt,leagueId:'league',leagueNameSnapshot:'Thursday Match Point',designation:'PRE',teamDescription:'Smith Team',lanesNeeded:2,notes:null,createdAt:scheduledAt,createdBy:'employee',createdByName:'Employee',updatedAt:scheduledAt,updatedBy:'employee',updatedByName:'Employee',version:1,startedAt:null,startedBy:null,startedByName:null,cancelledAt:null,cancelledBy:null,cancelledByName:null,cancellationNote:null,resultingSessionId:null})
+const booking=(id:string,scheduledAt:string,status:Booking['status']='SCHEDULED',type:Booking['type']='PRE_POST'):Booking=>({id,type,status,scheduledAt,leagueId:type==='PRE_POST'?'league':null,leagueNameSnapshot:type==='PRE_POST'?'Thursday Match Point':null,designation:type==='PRE_POST'?'PRE':null,teamDescription:type==='PRE_POST'?'Smith Team':null,partyName:type==='PARTY'?'Smith Birthday':null,partyAmountCents:type==='PARTY'?12000:null,customerName:type==='OPEN_PLAY'?'Johnson':null,expectedBowlers:type==='OPEN_PLAY'?8:null,lanesNeeded:2,notes:null,createdAt:scheduledAt,createdBy:'employee',createdByName:'Employee',updatedAt:scheduledAt,updatedBy:'employee',updatedByName:'Employee',version:1,startedAt:null,startedBy:null,startedByName:null,cancelledAt:null,cancelledBy:null,cancelledByName:null,cancellationNote:null,resultingSessionId:null})
 
 describe('scheduled bowling domain',()=>{
   it('orders upcoming chronologically and excludes cancelled/started bookings',()=>{const rows=scheduledBookings({b:booking('b','2026-09-24T16:00:00Z'),a:booking('a','2026-09-23T16:00:00Z'),c:booking('c','2026-09-22T16:00:00Z','CANCELLED')});expect(rows.map(row=>row.id)).toEqual(['a','b'])})
   it('identifies today using the counter device local date',()=>{const now=new Date(2026,8,23,9);const same=new Date(2026,8,23,18).toISOString();const next=new Date(2026,8,24,9).toISOString();expect(todayBookings({same:booking('same',same),next:booking('next',next)},now).map(row=>row.id)).toEqual(['same'])})
-  it('normalizes editor input without physical lanes',()=>{const draft=bookingDraft('2026-09-26T11:00','league','POST','  Jones  ',2,'  call desk  ');expect(draft).toMatchObject({leagueId:'league',designation:'POST',teamDescription:'Jones',lanesNeeded:2,notes:'call desk'});expect(draft).not.toHaveProperty('lanes')})
+  it('normalizes editor input without physical lanes',()=>{const draft=bookingDraft('PRE_POST','2026-09-26T11:00',2,'  call desk  ',{leagueId:'league',designation:'POST',teamDescription:'Jones'});expect(draft).toMatchObject({leagueId:'league',designation:'POST',teamDescription:'Jones',lanesNeeded:2,notes:'call desk'});expect(draft).not.toHaveProperty('lanes')})
+})
+
+describe('bowling schedule calendar',()=>{
+ it('renders a stable six-week month grid across month boundaries',()=>{const days=monthGrid(new Date(2026,8,1));expect(days).toHaveLength(42);expect(days[0].getDay()).toBe(0);expect(days[41].getDay()).toBe(6);expect(days.some(day=>day.getMonth()===7)).toBe(true);expect(days.some(day=>day.getMonth()===9)).toBe(true)})
+ it('dots only dates with scheduled bookings',()=>{const date=new Date(2026,8,26,12);const rows={scheduled:booking('scheduled',new Date(2026,8,26,11).toISOString()),started:booking('started',new Date(2026,8,27,11).toISOString(),'STARTED'),cancelled:booking('cancelled',new Date(2026,8,28,11).toISOString(),'CANCELLED')};expect(scheduledDateKeys(rows)).toEqual(new Set(['2026-09-26']));expect(bookingsForDate(rows,date).map(x=>x.id)).toEqual(['scheduled']);expect(bookingsForDate(rows,new Date(2026,8,29))).toEqual([])})
+ it('orders a selected date chronologically across all types',()=>{const day=(hour:number)=>new Date(2026,8,26,hour).toISOString();const rows={open:booking('open',day(18),'SCHEDULED','OPEN_PLAY'),pre:booking('pre',day(11)),party:booking('party',day(14),'SCHEDULED','PARTY')};expect(bookingsForDate(rows,new Date(2026,8,26)).map(x=>x.type)).toEqual(['PRE_POST','PARTY','OPEN_PLAY'])})
+})
+
+describe('expanded booking contract migration',()=>{
+ it('commits enum labels in a dedicated migration before the contract references them',()=>{expect(scheduleEnumMigration).toContain("add value if not exists 'PARTY'");expect(scheduleEnumMigration).toContain("add value if not exists 'OPEN_PLAY'");expect(scheduleEnumMigration).not.toContain('open_play_bookings_type_details');expect(scheduleMigration).not.toContain('alter type public.bsb_booking_type add value')})
+ it('extends one aggregate and keeps authoritative typed starts',()=>{expect(scheduleMigration).toContain('open_play_bookings_type_details');expect(scheduleMigration).toContain('for update');expect(scheduleMigration).toContain("if b.status='STARTED'");expect(scheduleMigration).toContain('cardinality(p_lanes)<>b.lanes_needed')})
+ it('snapshots Party amount but reads current Open Play settings at start',()=>{expect(scheduleMigration).toContain("'partyAmountCents',b.party_amount_cents");expect(scheduleMigration).toContain('select settings into cfg');expect(scheduleMigration).toContain("cfg->>'openBowlingLaneRateCents'");expect(scheduleMigration).not.toContain('future_price')})
 })
 
 describe('Upcoming Today reminder',()=>{
