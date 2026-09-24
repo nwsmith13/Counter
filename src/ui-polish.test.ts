@@ -37,8 +37,8 @@ describe('Slice 8 counter presentation', () => {
     expect(app).not.toContain("}>PLAY</p>")
   })
 
-  it('keeps the promoted 4/4/4 panel wordmark in one horizontal sign line', () => {
-    expect(app).toContain("const wordmarkWords = ['OPEN', 'PLAY', 'BOOK']")
+  it('keeps PLAY BOOK as the permanent wordmark while OPEN lives in the neon sign', () => {
+    expect(app).toContain("const wordmarkWords = ['PLAY', 'BOOK']")
     expect(app).toContain('wordmark-sections')
     expect(app).not.toContain('DEVELOPMENT — WORDMARK CONCEPTS')
     expect(app).not.toContain('function WordmarkPreview()')
@@ -50,12 +50,29 @@ describe('Slice 8 counter presentation', () => {
     expect(app).toContain('className="shared-connection connected chrome-connection"')
   })
 
+  it('uses protected grid areas for the responsive command header instead of overlapping header chrome', () => {
+    expect(app).toContain('className="app-header"')
+    expect(app).toContain('className="header-identity"')
+    expect(app).toContain('className="header-brand"')
+    expect(app).toContain("night?(poweringDown?'shutting-down':neonPresentation.toLowerCase()):'dark'")
+    expect(app).toContain('<nav className="nav" aria-label="Primary navigation">')
+  })
+
+  it('keeps compact secondary actions in More while retaining the requested primary controls', () => {
+    expect(app).toContain('className="nav-last-night"')
+    expect(app).toContain('className="header-more"')
+    expect(app).toContain('aria-haspopup="menu"')
+    expect(app).toContain("setSheet('LAST_NIGHT')")
+    expect(app).toContain("setSheet('SETTINGS')")
+    expect(app).toContain("setSheet('END_NIGHT')")
+  })
+
   it('keeps the production panel wordmark as an explicitly selected header component', () => {
     expect(app).toContain('className="production-wordmark wordmark-concept bowling-alley"')
   })
 
-  it('keeps the production mark in three clean four-letter groups', () => {
-    expect(app).toContain("const wordmarkWords = ['OPEN', 'PLAY', 'BOOK']")
+  it('keeps the production mark in two clean four-letter groups', () => {
+    expect(app).toContain("const wordmarkWords = ['PLAY', 'BOOK']")
     expect(app).toContain('className="production-wordmark wordmark-concept bowling-alley"')
   })
 

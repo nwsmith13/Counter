@@ -31,9 +31,9 @@ describe('identity pre-readiness polish', () => {
     expect(ui).toContain('className="identity-screen"')
   })
 
-  it('retains the OPEN startup state and reduced-motion styling without a continuous flicker loop', async () => {
+  it('keeps the mounted OPEN sign dark before its startup flicker without a continuous flicker loop', async () => {
     expect(board).toContain('neonPresentation.toLowerCase()')
-    expect(board).toContain("setNeonPresentation('HIDDEN')")
+    expect(board).not.toContain("setNeonPresentation('HIDDEN')")
     expect(board).toContain("setNeonPresentation('DARK')")
     expect(board).toContain("setNeonPresentation('STARTUP')")
     expect(board).toContain("setNeonPresentation('LIT')")

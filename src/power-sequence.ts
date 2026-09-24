@@ -6,6 +6,6 @@ export const OPEN_NEON_POWER_ON_MS = OPEN_SIGN_DARK_MS + OPEN_NEON_POST_LANE_DEL
 export const OPEN_NEON_STARTUP_DURATION_MS = 1180
 export const OPEN_NEON_STABLE_MS = OPEN_NEON_POWER_ON_MS + OPEN_NEON_STARTUP_DURATION_MS
 
-export type NeonPresentation = 'HIDDEN'|'DARK'|'STARTUP'|'LIT'
+export type NeonPresentation = 'DARK'|'STARTUP'|'LIT'
 export const neonPresentationAt = (elapsedMs:number, reducedMotion=false):NeonPresentation =>
-  reducedMotion || elapsedMs >= OPEN_NEON_STABLE_MS ? 'LIT' : elapsedMs >= OPEN_NEON_POWER_ON_MS ? 'STARTUP' : elapsedMs >= OPEN_SIGN_DARK_MS ? 'DARK' : 'HIDDEN'
+  reducedMotion || elapsedMs >= OPEN_NEON_STABLE_MS ? 'LIT' : elapsedMs >= OPEN_NEON_POWER_ON_MS ? 'STARTUP' : 'DARK'
