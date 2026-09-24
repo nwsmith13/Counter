@@ -44,10 +44,12 @@ describe('Slice 8 counter presentation', () => {
     expect(app).not.toContain('function WordmarkPreview()')
   })
 
-  it('keeps date/time in the subordinate right-side chrome above Connected', () => {
-    expect(app).toContain('className="header-chrome"')
-    expect(app).toContain('className="chrome-clock"')
-    expect(app).toContain('className="shared-connection connected chrome-connection"')
+  it('keeps date/time and connection in one subordinate status line above navigation', () => {
+    expect(app).toContain('className="header-left"')
+    expect(app).toContain('className="header-right"')
+    expect(app).toContain('className="header-status"')
+    expect(app).toContain('className="header-status-time"')
+    expect(app).toContain('className="shared-connection connected"')
   })
 
   it('uses protected grid areas for the responsive command header instead of overlapping header chrome', () => {
@@ -81,6 +83,13 @@ describe('Slice 8 counter presentation', () => {
     expect(app).toContain('className="open-neon-tube"')
     expect(app).not.toContain('aria-label="Open">OPEN</span>')
     expect(app).toContain('transform="translate(-8 0) scale(1.1 1)"')
+  })
+
+  it('uses shared modal sizing with compact schedule and close-night layout hooks', () => {
+    expect(app).toContain('className="schedule-sheet"')
+    expect(app).toContain('className="close-night-sheet"')
+    expect(app).toContain('className="activity-tiles"')
+    expect(app).toContain('className={`sheet ${className}`}')
   })
 
   it('keeps exactly five decorative approach markers above the Condition control', () => {
